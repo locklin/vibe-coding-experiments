@@ -1,0 +1,7 @@
+
+## Advanced Usage
+
+### Using Only Labeled Data
+
+If you don't have unlabeled data, you can still use the model:
+

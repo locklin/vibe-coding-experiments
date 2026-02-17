@@ -1,0 +1,288 @@
+---
+title: "Introduction to FastLogisticLowRank"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to FastLogisticLowRank}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Overview
+
+The `FastLogisticLowRank` package implements a fast binary logistic regression
+classifier using low-rank matrix approximation via SVD. This approach is
+particularly effective on datasets with many observations, as it reduces
+computational cost by projecting the design matrix into a lower-dimensional
+space.
+
+The algorithm is based on the Fast Binary Logistic Regression (FBLR) framework.
+
+## Basic Usage
+
+We'll start with a simple simulated binary classification problem:
+
+```{r basic}
+library(FastLogisticLowRank)
+
+set.seed(42)
+n <- 500
+p <- 10
+
+# Generate predictors
+X <- matrix(rnorm(n * p), n, p)
+colnames(X) <- paste0("feature_", 1:p)
+
+# True coefficients - only first 5 features matter
+beta_true <- c(1.5, -1.0, 0.8, -0.3, 0.5, rep(0, 5))
+
+# Generate binary response
+prob <- 1 / (1 + exp(-X %*% beta_true))
+y <- rbinom(n, 1, prob)
+
+# Fit the model
+fit <- FastLogisticRegressionLowRank(X, y)
+print(fit)
+```
+
+The model converges in a few iterations and provides coefficient estimates
+for all features.
+
+## Making Predictions
+
+The `predict` method supports three types of output:
+
+```{r predictions}
+# Split into train/test
+set.seed(42)
+train_idx <- sample(n, 400)
+X_train <- X[train_idx, ]
+y_train <- y[train_idx]
+X_test <- X[-train_idx, ]
+y_test <- y[-train_idx]
+
+fit <- FastLogisticRegressionLowRank(X_train, y_train)
+
+# Predicted probabilities
+probs <- predict(fit, X_test, type = "response")
+head(round(probs, 4))
+
+# Predicted class labels
+classes <- predict(fit, X_test, type = "class")
+table(Predicted = classes, Actual = y_test)
+
+# Accuracy
+cat("Test accuracy:", mean(classes == y_test), "\n")
+
+# Linear predictor (log-odds)
+eta <- predict(fit, X_test, type = "link")
+head(round(eta, 4))
+```
+
+## Adjusting the Decision Threshold
+
+For imbalanced datasets, you may want a threshold other than 0.5:
+
+```{r threshold}
+# More conservative predictions (higher precision)
+classes_high <- predict(fit, X_test, type = "class", threshold = 0.7)
+
+# More sensitive predictions (higher recall)
+classes_low <- predict(fit, X_test, type = "class", threshold = 0.3)
+
+cat("Predicted positives at threshold 0.3:", sum(classes_low == 1), "\n")
+cat("Predicted positives at threshold 0.5:", sum(classes == 1), "\n")
+cat("Predicted positives at threshold 0.7:", sum(classes_high == 1), "\n")
+```
+
+## Regularization
+
+The package supports two types of regularization:
+
+- **L2 regularization** via `lambda_ssr`: standard ridge-type penalty
+- **Adaptive Lp regularization** via `gamma` and `f`: penalizes based on
+  current coefficient magnitudes
+
+```{r regularization}
+# Unregularized
+fit_unreg <- FastLogisticRegressionLowRank(X_train, y_train)
+
+# L2 regularization
+fit_l2 <- FastLogisticRegressionLowRank(X_train, y_train, lambda_ssr = 0.5)
+
+# Adaptive penalty
+fit_lp <- FastLogisticRegressionLowRank(X_train, y_train, gamma = 0.5)
+
+# Combined
+fit_both <- FastLogisticRegressionLowRank(X_train, y_train,
+                                           lambda_ssr = 0.3, gamma = 0.2)
+
+# Compare coefficient magnitudes
+coef_comparison <- data.frame(
+  Feature = names(fit_unreg$coefficients),
+  Unregularized = round(fit_unreg$coefficients, 4),
+  L2 = round(fit_l2$coefficients, 4),
+  Lp = round(fit_lp$coefficients, 4),
+  Combined = round(fit_both$coefficients, 4)
+)
+print(coef_comparison, row.names = FALSE)
+```
+
+Regularization shrinks coefficients, especially for the noise features
+(features 6-10 which have true coefficient 0).
+
+## Example: Diabetes Classification
+
+Here we demonstrate a use case inspired by the FBLR paper's diabetes dataset
+example. We simulate a dataset with properties similar to the Pima Indians
+Diabetes dataset:
+
+```{r diabetes}
+set.seed(123)
+n <- 768
+p <- 8
+
+# Simulate features: glucose, blood pressure, BMI, age, etc.
+X_diabetes <- cbind(
+  glucose = rnorm(n, 120, 30),
+  blood_pressure = rnorm(n, 70, 12),
+  skin_thickness = rnorm(n, 25, 10),
+  insulin = rnorm(n, 150, 80),
+  bmi = rnorm(n, 32, 7),
+  dpf = rnorm(n, 0.47, 0.33),
+  age = rnorm(n, 33, 12),
+  pregnancies = rpois(n, 3.8)
+)
+
+# Generate outcome based on a subset of features
+logits <- 0.02 * X_diabetes[, "glucose"] + 0.03 * X_diabetes[, "bmi"] +
+          0.01 * X_diabetes[, "age"] - 3
+prob_diabetes <- 1 / (1 + exp(-logits))
+y_diabetes <- rbinom(n, 1, prob_diabetes)
+
+cat("Class balance:", table(y_diabetes), "\n")
+
+# Train/test split
+train_idx <- sample(n, 600)
+X_d_train <- X_diabetes[train_idx, ]
+y_d_train <- y_diabetes[train_idx]
+X_d_test <- X_diabetes[-train_idx, ]
+y_d_test <- y_diabetes[-train_idx]
+
+# Fit model
+fit_diabetes <- FastLogisticRegressionLowRank(X_d_train, y_d_train)
+summary(fit_diabetes)
+
+# Evaluate
+preds <- predict(fit_diabetes, X_d_test, type = "class")
+cat("\nTest accuracy:", mean(preds == y_d_test), "\n")
+cat("Confusion matrix:\n")
+print(table(Predicted = preds, Actual = y_d_test))
+```
+
+## Model Details
+
+Use `summary()` to see full model details including rank, convergence status,
+and regularization parameters:
+
+```{r summary}
+summary(fit)
+```
+
+## Tuning Parameters
+
+Key parameters and their effects:
+
+| Parameter | Effect |
+|-----------|--------|
+| `energy_percentile` | Controls the rank of the approximation. Lower values = more aggressive rank reduction |
+| `lambda_ssr` | L2 regularization strength. Higher = more shrinkage |
+| `gamma` | Lp regularization strength |
+| `f` | Controls the adaptiveness of the Lp penalty (0 = L2, 1 = L1-like) |
+| `convergence_tolerance` | Smaller values = tighter convergence |
+| `maximum_iteration` | Upper bound on optimization iterations |
+
+```{r tuning}
+# Effect of energy_percentile on rank
+for (ep in c(50, 90, 99, 99.9999)) {
+  fit_ep <- FastLogisticRegressionLowRank(X_train, y_train, energy_percentile = ep)
+  cat("energy_percentile =", ep, " -> rank =", fit_ep$rank, "\n")
+}
+```
+
+## Cross-Validation for Lambda Selection
+
+When using L2 regularization, `CvFastLogisticLowRank()` uses
+the [CVST](https://cran.r-project.org/package=CVST) package to select the
+optimal `lambda_ssr` value via cross-validation. Two methods are supported:
+
+- **`"CV"`**: Standard k-fold cross-validation
+- **`"fastCV"`**: Fast cross-validation via sequential testing, which
+  eliminates underperforming candidates early
+
+```{r cv, eval = requireNamespace("CVST", quietly = TRUE)}
+library(CVST)
+
+# Define a grid of lambda values to search
+lambda_grid <- c(0.001, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0)
+
+# Standard 5-fold CV
+cv_result <- CvFastLogisticLowRank(X_train, y_train,
+  lambda_values = lambda_grid,
+  method = "CV", fold = 5, verbose = FALSE)
+
+cat("Best lambda (CV):", cv_result$best_lambda, "\n")
+
+# Fast CV via sequential testing
+cv_fast <- CvFastLogisticLowRank(X_train, y_train,
+  lambda_values = lambda_grid,
+  method = "fastCV", verbose = FALSE)
+
+cat("Best lambda (fastCV):", cv_fast$best_lambda, "\n")
+```
+
+Use the selected lambda to fit the final model:
+
+```{r cv-final, eval = requireNamespace("CVST", quietly = TRUE)}
+fit_cv <- FastLogisticRegressionLowRank(X_train, y_train,
+  lambda_ssr = cv_result$best_lambda)
+
+preds_cv <- predict(fit_cv, X_test, type = "class")
+cat("Test accuracy with CV-selected lambda:", mean(preds_cv == y_test), "\n")
+```
+
+You can also pass additional fixed parameters while tuning `lambda_ssr`:
+
+```{r cv-extra, eval = requireNamespace("CVST", quietly = TRUE)}
+# CV with gamma held fixed
+cv_with_gamma <- CvFastLogisticLowRank(X_train, y_train,
+  lambda_values = c(0.01, 0.1, 1.0),
+  method = "CV", fold = 3, verbose = FALSE,
+  gamma = 0.1)
+
+cat("Best lambda (with gamma=0.1):", cv_with_gamma$best_lambda, "\n")
+```
+
+### Diabetes Example with Cross-Validation
+
+Applying CV to the diabetes classification problem:
+
+```{r cv-diabetes, eval = requireNamespace("CVST", quietly = TRUE)}
+cv_diabetes <- CvFastLogisticLowRank(X_d_train, y_d_train,
+  lambda_values = 10^seq(-3, 1, length.out = 8),
+  method = "CV", fold = 5, verbose = FALSE)
+
+cat("Best lambda for diabetes data:", cv_diabetes$best_lambda, "\n")
+
+fit_diabetes_cv <- FastLogisticRegressionLowRank(X_d_train, y_d_train,
+  lambda_ssr = cv_diabetes$best_lambda)
+
+preds_diabetes_cv <- predict(fit_diabetes_cv, X_d_test, type = "class")
+cat("Test accuracy with CV-tuned model:", mean(preds_diabetes_cv == y_d_test), "\n")
+```

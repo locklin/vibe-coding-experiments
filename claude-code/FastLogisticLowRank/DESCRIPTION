@@ -1,0 +1,24 @@
+Package: FastLogisticLowRank
+Title: Fast Binary Logistic Regression via Low-Rank Approximation
+Version: 0.2.0
+Authors@R: person("FastLogisticLowRank", "Authors", email = "maintainer@example.com", role = c("aut", "cre"))
+Description: Implements a fast binary logistic regression classifier using low-rank
+    matrix approximation via SVD. The algorithm reduces computational cost by
+    projecting the design matrix into a lower-dimensional space determined by an
+    energy-based rank selection criterion. Supports L2 and adaptive Lp
+    regularization. Based on the methodology described in the FBLR (Fast Binary
+    Logistic Regression) framework.
+License: GPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Depends: R (>= 3.5.0)
+Imports:
+    stats
+Suggests:
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    CVST
+VignetteBuilder: knitr
+Config/testthat/edition: 3

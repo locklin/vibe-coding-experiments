@@ -1,0 +1,50 @@
+useDynLib(mlpackplus, .registration = TRUE)
+importFrom(Rcpp, evalCpp)
+importFrom(stats, predict, update)
+
+# Decision Tree
+export(DecisionTreeRegressor)
+
+# Random Forest
+export(RandomForestRegressor)
+
+# AMF
+export(AMF)
+
+# SpillTree KNN
+export(SpillTreeKNN)
+
+# Cross-Validation
+export(kfold_cv)
+export(simple_cv)
+
+# Tuning
+export(grid_search)
+export(random_search)
+
+# mlpack-style API
+export(decision_tree)
+export(random_forest)
+
+# Update methods
+S3method(update, DecisionTreeRegressor)
+S3method(update, RandomForestRegressor)
+S3method(update, AMF)
+
+# Predict methods
+S3method(predict, DecisionTreeRegressor)
+S3method(predict, RandomForestRegressor)
+S3method(predict, AMF)
+S3method(predict, SpillTreeKNN)
+
+# Print methods
+S3method(print, DecisionTreeRegressor)
+S3method(print, RandomForestRegressor)
+S3method(print, AMF)
+S3method(print, SpillTreeKNN)
+
+# Utility functions
+export(mse)
+export(rmse)
+export(mae)
+export(r_squared)

@@ -1,0 +1,13 @@
+export(FastLogisticRegressionLowRank)
+export(predict.FastLogisticLowRank)
+export(CvFastLogisticLowRank)
+
+S3method(predict, FastLogisticLowRank)
+S3method(print, FastLogisticLowRank)
+S3method(summary, FastLogisticLowRank)
+S3method(print, FastLogisticLowRankCV)
+S3method(DetermineRank, FblrSvd)
+S3method(ComputeU, FblrSvd)
+S3method(Truncate, FblrSvd)
+
+importFrom(stats, rbinom, rnorm, runif, predict)

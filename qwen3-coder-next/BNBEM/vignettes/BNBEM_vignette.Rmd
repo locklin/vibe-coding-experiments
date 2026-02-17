@@ -1,0 +1,173 @@
+---
+title: "BNBEM: Bernoulli Naive Bayes with EM Algorithm"
+author: "R Package Author"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{BNBEM: Bernoulli Naive Bayes with EM Algorithm}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+This vignette demonstrates how to use the **BNBEM** package for Bernoulli Naive Bayes classification with semi-supervised learning via the EM algorithm.
+
+## Installation
+
+```{r, eval = FALSE}
+# Install from GitHub
+# devtools::install_github("username/BNBEM")
+```
+
+## Basic Usage
+
+### 1. Loading the Package
+
+```{r}
+library(BNBEM)
+```
+
+### 2. Creating Simple Document Vectors
+
+Let's create a simple example with two document types: "sports" and "technology".
+
+```{r}
+# Sports documents (labeled)
+sports_doc1 <- c("ball", "game", "win", "team", "score")
+sports_doc2 <- c("player", "game", "team", "champion", "score")
+sports_doc3 <- c("match", "win", "team", "player", "score")
+
+# Technology documents (labeled)
+tech_doc1 <- c("computer", "software", "program", "code", "data")
+tech_doc2 <- c("digital", "system", "program", "code", "internet")
+tech_doc3 <- c("computer", "digital", "data", "system", "program")
+
+# Combine into lists
+labeled_docs <- list(
+  sports_doc1,
+  sports_doc2,
+  sports_doc3,
+  tech_doc1,
+  tech_doc2,
+  tech_doc3
+)
+labeled_labels <- c("sports", "sports", "sports", "tech", "tech", "tech")
+
+labeled_data <- list(
+  documents = labeled_docs,
+  labels = labeled_labels
+)
+```
+
+### 3. Creating Unlabeled Documents for Semi-Supervised Learning
+
+```{r}
+# Unlabeled documents that we want the algorithm to classify
+unlabeled_doc1 <- c("ball", "game", "team", "player", "win")
+unlabeled_doc2 <- c("computer", "software", "code", "digital", "data")
+unlabeled_doc3 <- c("ball", "team", "score", "champion", "game")
+unlabeled_docs <- list(unlabeled_doc1, unlabeled_doc2, unlabeled_doc3)
+```
+
+### 4. Fitting the Model with EM Algorithm
+
+```{r}
+# Fit Bernoulli Naive Bayes model with semi-supervised learning
+model <- fit_bnbem(
+  labeled_data = labeled_data,
+  unlabeled_data = unlabeled_docs,
+  max_iterations = 100,
+  tolerance = 1e-6,
+  seed = 42,
+  smoothing = 1
+)
+
+# Print model summary
+print(model)
+```
+
+### 5. Making Predictions on New Documents
+
+```{r}
+# New documents to classify
+new_docs <- list(
+  c("ball", "game", "win", "team"),
+  c("computer", "software", "code", "data"),
+  c("player", "score", "champion", "game")
+)
+
+# Predict classes
+predictions <- predict(model, new_docs, return_probs = TRUE)
+
+cat("Predictions:\n")
+print(predictions$predictions)
+
+cat("\nClass probabilities:\n")
+print(predictions$probabilities)
+```
+
+### 6. Using the `preprocess_documents` Helper Function
+
+For real text documents, you can use the preprocessing function:
+
+```{r}
+# Raw text documents
+raw_texts <- c(
+  "The team won the championship game with an amazing performance",
+  "The new computer software enables faster data processing"
+)
+
+# Preprocess to get word stems
+preprocessed <- preprocess_documents(raw_texts, language = "en")
+
+cat("Raw texts:\n")
+print(raw_texts)
+
+cat("\nPreprocessed (stemmed) words:\n")
+print(preprocessed)
+```
+
+### 7. Creating Synthetic Test Data
+
+For testing and demonstration purposes, you can generate synthetic data:
+
+```{r}
+# Generate synthetic data with clear class separation
+synthetic_data <- create_test_data(
+  n_labeled = 20,
+  n_unlabeled = 50,
+  n_words = 50,
+  n_classes = 2,
+  class_separation = 3,
+  seed = 123
+)
+
+# View the structure
+cat("Labeled data sample:\n")
+print(head(synthetic_data$labeled_data$documents))
+cat("\nLabeled labels:\n")
+print(head(synthetic_data$labeled_data$labels))
+
+cat("\nNumber of unlabeled documents:", length(synthetic_data$unlabeled_data), "\n")
+```
+
+## Summary
+
+The **BNBEM** package provides:
+
+- **Bernoulli Naive Bayes**: Classifies documents based on word presence/absence
+- **Semi-supervised Learning**: Uses unlabeled data via EM algorithm
+- **Simple API**: Easy-to-use functions for fitting and prediction
+- **Text preprocessing**: Built-in text cleaning and stemming
+
+## Session Info
+
+```{r, echo = FALSE}
+sessionInfo()
+```
