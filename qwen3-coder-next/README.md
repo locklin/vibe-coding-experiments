@@ -12,7 +12,7 @@ numactl --interleave=all ./build/bin/llama-server \
 
 and emacs gptel-agent
 
-BNBEM:
+# BNBEM:
 
   I want to implement this paper as R code in a new repo called BernoulliNBEM. https://www.cs.columbia.edu/~mcollins/em.pdf
   Don't ask me to install playwrite, it's already installed and I don't feel like giving you any passwords. If you can't find it, use something else.
@@ -27,5 +27,11 @@ BNBEM:
   sports, with the kind of sport being the class).
 
 
-FastLogisticLowRankQ:
+# FastLogisticLowRankQ:
 
+  So, I want to translate the python logistic regression algorithm in the following python file
+  https://github.com/NurdanS/fblr/blob/main/customClassifier.py
+  into a small R package called FastLogisticLowRankQ. The package should have one function for fitting X to Y with all the relevant parameters. Call it FastLogisticRegressionLowRank. It should have a predict method for making predictions, both binary and probabilistic. Make extensive test scripts using testthat package.
+  The package needs manual files and a vignette demonstrating its use.
+  Once a 0.1.0 version of the package is built, add a cross validation methodology for picking an optimal lambda using R's CVST package https://cran.r-project.org/web/packages/CVST/ Once this is done, add some tests for it, an example in the manual page and vignettes and update the package version to 0.1.1, 
+  There are examples in the full python repo that might make good vignette cases or test examples.  https://github.com/NurdanS/fblr -feel free to use some of those.
