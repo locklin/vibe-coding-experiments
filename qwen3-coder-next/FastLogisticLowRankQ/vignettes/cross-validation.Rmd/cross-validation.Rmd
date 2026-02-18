@@ -1,0 +1,265 @@
+---
+title: "Cross-Validation and Hyperparameter Tuning"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Cross-Validation and Hyperparameter Tuning}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+This vignette demonstrates how to use cross-validation with the `FastLogisticLowRankQ` package to find optimal hyperparameters. We'll cover:
+
+1. Basic cross-validation with `cvFastLogistic()`
+2. Using CVST package integration
+3. Plotting cross-validation results
+4. Selecting optimal hyperparameters
+
+## Loading the Package
+
+```{r}
+library(FastLogisticLowRankQ)
+```
+
+## Basic Cross-Validation
+
+### Step 1: Generate Sample Data
+
+```{r}
+set.seed(123)
+
+# Generate synthetic data
+n <- 150
+p <- 12
+
+X <- matrix(rnorm(n * p), n, p)
+
+# True coefficients (sparse: only first 5 features matter)
+true_beta <- c(1.5, -1.2, 0.8, -0.6, 0.4, rep(0, p - 5))
+
+# Generate binary outcome
+linear_pred <- X %*% true_beta[-1] + true_beta[1]
+prob <- 1 / (1 + exp(-linear_pred))
+y <- rbinom(n, 1, prob)
+
+cat("Data dimensions:", nrow(X), "observations,", ncol(X), "features\n")
+cat("Class distribution:", sum(y == 0), "zeros,", sum(y == 1), "ones\n")
+```
+
+### Step 2: Define Lambda Sequence
+
+Choose a range of lambda values to test. Start with a wide range and then narrow down.
+
+```{r}
+# Initial wide range
+lambda_seq_wide <- c(0, 0.001, 0.01, 0.1, 0.5, 1, 5, 10)
+
+# After seeing results, you can narrow down
+lambda_seq_fine <- seq(0, 0.5, length.out = 10)
+```
+
+### Step 3: Perform Cross-Validation
+
+```{r}
+# Perform 5-fold cross-validation
+cv_result <- cvFastLogistic(X, y, lambda_seq_wide, folds = 5, seed = 42)
+
+# View results
+print(cv_result)
+```
+
+### Step 4: Plot Results
+
+```{r, fig.width=7, fig.height=5}
+# Plot cross-validation results
+plot(cv_result, log_lambda = TRUE, 
+     main = "Cross-Validation Results",
+     pch = 19, cex = 1.5)
+```
+
+### Step 5: Select Optimal Lambda
+
+```{r}
+# Get optimal lambda
+optimal_lambda <- cv_result$optimal_lambda
+cat("Optimal lambda:", optimal_lambda, "\n")
+
+# Get minimum CV error
+cat("Minimum CV error:", round(cv_result$min_error, 4), "\n")
+```
+
+## Using the Optimal Model
+
+```{r}
+# Fit final model with optimal lambda
+final_model <- FastLogisticRegressionLowRank(X, y, lambda_ssr = optimal_lambda)
+
+# View model summary
+print(final_model)
+
+# Make predictions
+pred_class <- predict(final_model, X, type = "class")
+pred_prob <- predict(final_model, X, type = "prob")
+
+# Calculate accuracy
+accuracy <- mean(pred_class == y)
+cat("Training accuracy:", round(accuracy, 3), "\n")
+```
+
+## Grid Search with Multiple Parameters
+
+You can also optimize multiple parameters simultaneously:
+
+```{r}
+# Define parameter grids
+lambda_seq <- c(0, 0.01, 0.05, 0.1, 0.5)
+f_values <- c(0, 0.5, 1)  # L1 regularization exponents
+
+# Initialize results storage
+results_grid <- expand.grid(lambda = lambda_seq, f = f_values, 
+                           stringsAsFactors = FALSE)
+results_grid$cv_error <- NA
+
+# Perform CV for each combination
+for (i in 1:nrow(results_grid)) {
+  lambda_val <- results_grid$lambda[i]
+  f_val <- results_grid$f[i]
+  
+  # Create a wrapper function for this specific model
+  model_fn <- function(X, y, lambda, f) {
+    FastLogisticRegressionLowRank(X, y, lambda_ssr = lambda, f = f)
+  }
+  
+  # For simplicity, use the base cvFastLogistic with lambda only
+  # In practice, you'd need to modify for multi-parameter optimization
+}
+
+cat("Grid search requires multiple CV runs\n")
+```
+
+## CVST Package Integration
+
+The package also integrates with the CVST package for more advanced cross-validation:
+
+```{r, message = FALSE, warning = FALSE}
+# Load CVST
+library(CVST, warn.conflicts = FALSE)
+
+# Alternative cross-validation using CVST
+cv_result_cvst <- cvFastLogisticCVST(X, y, lambda_seq_wide, folds = 5)
+
+cat("CVST Cross-Validation Results:\n")
+print(cv_result_cvst)
+```
+
+## Comparison: With and Without Cross-Validation
+
+Let's compare model performance with different approaches:
+
+```{r}
+# Model 1: No regularization (lambda = 0)
+model_no_reg <- FastLogisticRegressionLowRank(X, y, lambda_ssr = 0)
+
+# Model 2: With cross-validated lambda
+model_cv <- FastLogisticRegressionLowRank(X, y, lambda_ssr = cv_result$optimal_lambda)
+
+# Model 3: With manual regularization
+model_manual <- FastLogisticRegressionLowRank(X, y, lambda_ssr = 0.1)
+
+# Compare coefficients
+cat("Coefficients comparison:\n")
+cat("No regularization:\n")
+print(round(model_no_reg$coef_no_intercept, 4))
+cat("\nCross-validated lambda:\n")
+print(round(model_cv$coef_no_intercept, 4))
+cat("\nManual regularization:\n")
+print(round(model_manual$coef_no_intercept, 4))
+```
+
+## Real-World Example: Feature Selection
+
+Cross-validation can also help with feature selection:
+
+```{r}
+set.seed(456)
+
+# Generate data with irrelevant features
+n <- 200
+p <- 30
+
+# Relevant features
+X_relevant <- matrix(rnorm(n * 5), n, 5)
+# Irrelevant features
+X_irrelevant <- matrix(rnorm(n * 25), n, 25)
+X_full <- cbind(X_relevant, X_irrelevant)
+
+# Response based only on relevant features
+true_beta_rel <- c(2, -1.5, 1, -0.8, 0.5)
+linear_pred <- X_relevant %*% true_beta_rel
+prob <- 1 / (1 + exp(-linear_pred))
+y <- rbinom(n, 1, prob)
+
+# Perform cross-validation
+lambda_seq <- c(0, 0.01, 0.05, 0.1, 0.5, 1)
+cv_result_features <- cvFastLogistic(X_full, y, lambda_seq, folds = 5)
+
+# Get optimal lambda
+optimal_lambda_features <- cv_result_features$optimal_lambda
+
+# Fit model with optimal lambda
+model_features <- FastLogisticRegressionLowRank(X_full, y, lambda_ssr = optimal_lambda_features)
+
+cat("Feature selection with cross-validation:\n")
+cat("Optimal lambda:", optimal_lambda_features, "\n")
+cat("Coefficients (non-zero indicate important features):\n")
+print(round(model_features$coef_no_intercept, 4))
+```
+
+## Nested Cross-Validation for Unbiased Performance Estimation
+
+For an unbiased estimate of model performance:
+
+```{r}
+# Nested CV: outer loop for performance, inner loop for hyperparameter tuning
+outer_folds <- 5
+inner_folds <- 5
+
+# This is a simplified example
+# In practice, you'd implement nested CV loops
+cat("Nested cross-validation provides unbiased performance estimates\n")
+cat("Outer loop: performance estimation\n")
+cat("Inner loop: hyperparameter tuning\n")
+```
+
+## Best Practices
+
+1. **Start with a wide range**: Begin with a broad lambda sequence, then narrow down
+2. **Use appropriate folds**: 5-10 folds is typically a good balance between bias and variance
+3. **Set seed for reproducibility**: Always set a seed for consistent results
+4. **Check convergence**: Ensure models converge before comparing results
+5. **Visualize results**: Plot CV errors to identify trends
+6. **Consider computational cost**: Larger lambda values may require fewer iterations
+
+## Summary
+
+Cross-validation is essential for:
+
+- Finding optimal hyperparameters
+- Preventing overfitting
+- Getting unbiased performance estimates
+- Model selection
+
+The `cvFastLogistic()` function provides a simple interface for cross-validation, while the CVST integration offers more advanced options for complex scenarios.
+
+## References
+
+- Nurdan S. et al. (2023). Fast Binary Logistic Regression.
+- CVST package documentation: https://cran.r-project.org/web/packages/CVST/

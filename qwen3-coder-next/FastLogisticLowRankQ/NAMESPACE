@@ -1,0 +1,11 @@
+# NAMESPACE file for FastLogisticLowRankQ
+export(FastLogisticRegressionLowRank)
+export(predict)
+export(cvFastLogistic)
+export(cvFastLogisticCVST)
+export(plot.cvFastLogistic)
+export(print.cvFastLogistic)
+
+S3method(predict, FastLogisticRegressionLowRank)
+S3method(plot, cvFastLogistic)
+S3method(print, cvFastLogistic)
